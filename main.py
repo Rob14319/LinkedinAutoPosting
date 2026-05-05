@@ -45,7 +45,7 @@ Write only the post. No titles, no preamble."""
     for attempt in range(3):
         try:
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-2.0-flash',
                 contents=prompt
             )
             return response.text.strip()
@@ -53,7 +53,7 @@ Write only the post. No titles, no preamble."""
             print(f"⚠️ API call failed on attempt {attempt + 1}: {e}")
             if attempt == 2:
                 raise e
-            time.sleep(5)
+            time.sleep(10)
 
 
 # ─── Write to GitHub Step Summary ──────────────────────────────────────────────
