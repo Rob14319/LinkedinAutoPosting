@@ -2,7 +2,7 @@ name: Daily LinkedIn Post
 
 on:
   schedule:
-    - cron: '35 10 * * *'  # 4:05 PM IST (UTC+5:30) for testing
+    - cron: '30 4 * * *'  # 10:00 AM IST (UTC+5:30)
   workflow_dispatch:        # Allows manual trigger from GitHub UI
 
 jobs:
