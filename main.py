@@ -99,18 +99,35 @@ Write only the post. No titles, no preamble."""
 
 # ─── Write to GitHub Step Summary ──────────────────────────────────────────────
 def write_github_summary(content: str) -> None:
+    import urllib.parse
     summary_file = os.getenv("GITHUB_STEP_SUMMARY")
     if summary_file:
+        # Create a WhatsApp Smart Link
+        encoded_text = urllib.parse.quote(f"Please review this LinkedIn draft:\n\n{content}")
+        whatsapp_url = f"https://wa.me/?text={encoded_text}"
+        
         with open(summary_file, "a", encoding="utf-8") as f:
-            f.write("## 📝 LinkedIn Post Draft\n\n")
-            f.write("> **Please review the generated post below.**\n> \n")
-            f.write("> If it looks good, click the **Review deployments** button to approve the Production environment and publish it!\n\n")
-            f.write("---\n\n")
-            for line in content.split("\n"):
-                f.write(f"{line}<br>\n")
-            f.write("\n---\n")
-            f.write("🚀 *This post will be published automatically upon your approval.*\n")
-        print("✅ Added draft to GitHub Step Summary.")
+            f.write("# 🚀 LinkedIn Post Ready for Review\n\n")
+            f.write("| Feature | Action |\n")
+            f.write("| :--- | :--- |\n")
+            f.write(f"| **WhatsApp Preview** | [📲 Open in WhatsApp]({whatsapp_url}) |\n")
+            f.write("| **Publishing** | Click 'Review deployments' above to Approve |\n\n")
+            
+            f.write("## 📝 Generated Draft Content\n")
+            f.write("> [!NOTE]\n")
+            f.write("> This post was generated using Gemini 1.5 Flash based on today's rotation topic.\n\n")
+            
+            f.write("```text\n")
+            f.write(f"{content}\n")
+            f.write("```\n\n")
+            
+            f.write("---\n")
+            f.write("### 🛠 Next Steps\n")
+            f.write("1. Click the **WhatsApp link** above to read it comfortably on your phone.\n")
+            f.write("2. If you want to change anything, click **Reject** and edit the script.\n")
+            f.write("3. If it looks great, click **Approve** to publish it live to LinkedIn! 🚀\n")
+            
+        print("✅ Added professional draft summary to GitHub.")
 
 
 # ─── Post to LinkedIn ──────────────────────────────────────────────────────────
