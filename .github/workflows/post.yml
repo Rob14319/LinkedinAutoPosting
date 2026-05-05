@@ -6,24 +6,59 @@ on:
   workflow_dispatch:        # Allows manual trigger from GitHub UI
 
 jobs:
-  post:
+  generate:
+    name: Generate Post & Notify
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run LinkedIn agent
-        run: python main.py
+      - name: Generate Post and Send WhatsApp Notification
+        run: python main.py --generate
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          CALLMEBOT_API_KEY: ${{ secrets.CALLMEBOT_API_KEY }}
+          
+      - name: Upload draft artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-draft
+          path: draft.txt
+          retention-days: 1
+
+  publish:
+    name: Publish to LinkedIn
+    needs: generate
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download draft artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: post-draft
+          
+      - name: Publish Post
+        run: python main.py --post
+        env:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
           LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
