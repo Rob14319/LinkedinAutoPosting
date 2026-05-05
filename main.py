@@ -51,40 +51,48 @@ Write only the post. No titles, no preamble."""
         print(f"⚠️ Could not list models: {e}. Falling back to default names.")
         available_models = []
 
-    # Priority list of models to try (based on your actual available models list)
-    model_priority = [
-        'gemini-flash-latest',
-        'gemini-flash-lite-latest',
-        'gemini-pro-latest',
-        'gemini-2.0-flash-lite',
-        'gemma-3-27b-it',
-    ]
+    # Aggressive search: try every model that contains 'flash', 'pro', or 'gemma'
+    models_to_try = []
+    for m in available_models:
+        name = m.replace("models/", "")
+        # Only try models that are likely to be text generation models
+        if any(keyword in name.lower() for keyword in ["flash", "pro", "gemma", "nano"]):
+            # Skip models that are obviously for other tasks
+            if any(skip in name.lower() for skip in ["embedding", "imagen", "veo", "aqa", "tts"]):
+                continue
+            models_to_try.append(name)
+    
+    # Sort them to prioritize 'flash' and 'lite' models
+    models_to_try.sort(key=lambda x: ("flash" not in x.lower(), "lite" not in x.lower(), x))
 
-    # Try each model in priority until one works
-    for model_name in model_priority:
-        # Check if model is in the available list
-        full_model_path = f"models/{model_name}"
-        if available_models and full_model_path not in available_models:
+    print(f"📋 Will attempt these models in order: {models_to_try}")
+
+    for model_name in models_to_try:
+        print(f"🤖 Attempting to generate with model: {model_name}...")
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            return response.text.strip()
+        except Exception as e:
+            print(f"⚠️ {model_name} failed: {e}")
+            # If it's a transient 503 error, try once more with a sleep
+            if "503" in str(e):
+                print("   Retrying once after 10s...")
+                time.sleep(10)
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt
+                    )
+                    return response.text.strip()
+                except:
+                    pass
+            # Otherwise, just move to the next model in the list
             continue
 
-        print(f"🤖 Attempting to generate with model: {model_name}...")
-        for attempt in range(2): # 2 attempts per model
-            try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt
-                )
-                return response.text.strip()
-            except Exception as e:
-                print(f"⚠️ Attempt {attempt + 1} with {model_name} failed: {e}")
-                # If it's a quota error (limit 0), don't bother retrying this model
-                if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
-                    print(f"❌ {model_name} quota exceeded. Trying next model...")
-                    break 
-                if "503" in str(e):
-                    time.sleep(10)
-                    continue
-                break # Try next model for other errors
+    raise Exception("❌ All available models failed. Your API key might have 0 quota for all generation models.")
 
     raise Exception("❌ All models failed to generate content. Please check your API key and quota.")
 
