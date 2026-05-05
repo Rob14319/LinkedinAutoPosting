@@ -1,7 +1,6 @@
 import os
 import requests
 import argparse
-import urllib.parse
 from google import genai
 from dotenv import load_dotenv
 from datetime import date
@@ -49,27 +48,20 @@ Write only the post. No titles, no preamble."""
     return response.text.strip()
 
 
-# ─── Send WhatsApp Notification ─────────────────────────────────────────────────
-def send_whatsapp_notification(content: str, run_id: str) -> None:
-    phone = os.getenv("WHATSAPP_PHONE")
-    apikey = os.getenv("CALLMEBOT_API_KEY")
-    repo = os.getenv("GITHUB_REPOSITORY")
-    
-    if not phone or not apikey:
-        print("⚠️ WhatsApp credentials not found. Skipping notification.")
-        return
-
-    approval_url = f"https://github.com/{repo}/actions/runs/{run_id}" if repo and run_id else "GitHub Actions"
-    
-    message = f"🤖 *LinkedIn Post Draft Ready for Approval!*\n\n{content}\n\n👉 *Approve here:* {approval_url}"
-    encoded_message = urllib.parse.quote(message)
-    
-    url = f"https://api.callmebot.com/whatsapp.php?phone={phone}&text={encoded_message}&apikey={apikey}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        print("✅ WhatsApp notification sent!")
-    else:
-        print(f"❌ Failed to send WhatsApp notification. Error: {response.text}")
+# ─── Write to GitHub Step Summary ──────────────────────────────────────────────
+def write_github_summary(content: str) -> None:
+    summary_file = os.getenv("GITHUB_STEP_SUMMARY")
+    if summary_file:
+        with open(summary_file, "a", encoding="utf-8") as f:
+            f.write("## 📝 LinkedIn Post Draft\n\n")
+            f.write("> **Please review the generated post below.**\n> \n")
+            f.write("> If it looks good, click the **Review deployments** button to approve the Production environment and publish it!\n\n")
+            f.write("---\n\n")
+            for line in content.split("\n"):
+                f.write(f"{line}<br>\n")
+            f.write("\n---\n")
+            f.write("🚀 *This post will be published automatically upon your approval.*\n")
+        print("✅ Added draft to GitHub Step Summary.")
 
 
 # ─── Post to LinkedIn ──────────────────────────────────────────────────────────
@@ -110,7 +102,7 @@ def post_to_linkedin(content: str) -> None:
 # ─── Entry point ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--generate', action='store_true', help='Generate post and notify via WhatsApp')
+    parser.add_argument('--generate', action='store_true', help='Generate post and add to GitHub Summary')
     parser.add_argument('--post', action='store_true', help='Publish the post from draft file to LinkedIn')
     args = parser.parse_args()
 
@@ -126,9 +118,7 @@ if __name__ == "__main__":
         with open("draft.txt", "w", encoding="utf-8") as f:
             f.write(post)
             
-        print("📤 Sending WhatsApp notification for approval...")
-        run_id = os.getenv("GITHUB_RUN_ID", "")
-        send_whatsapp_notification(post, run_id)
+        write_github_summary(post)
         print("🎉 Generation complete! Waiting for approval on GitHub.")
 
     elif args.post:
