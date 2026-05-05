@@ -8,21 +8,12 @@ load_dotenv()
 
 # ─── Topics rotation ───────────────────────────────────────────────────────────
 TOPICS = [
-    "a mistake I made as an entrepreneur and what it taught me",
-    "the unglamorous side of building a business nobody talks about",
-    "a counterintuitive lesson about money and business growth",
-    "how I learned to make decisions with incomplete information",
-    "what a failure taught me about resilience and starting over",
-    "the moment I realized I was thinking about business all wrong",
-    "a small habit that quietly changed how I run my business",
-    "what I wish I knew before starting my entrepreneurial journey",
-    "a conversation that shifted how I think about leadership",
-    "the difference between being busy and actually building something",
-    "what building a business taught me about human nature",
-    "a risk I took that didn't pay off — and why I'd do it again",
-    "how I learned to say no and why it changed everything",
-    "the mentor advice I ignored (and later regretted)",
-    "what entrepreneurship really feels like at 2am",
+    "a lesson I learned about entrepreneurship the hard way",
+    "why personal branding is more than just a buzzword",
+    "a digital marketing strategy that completely surprised me",
+    "what building a digital presence taught me about consistency",
+    "how marketing automation saved my sanity",
+    "a real-world application of AI that changed how I work",
 ]
 
 
