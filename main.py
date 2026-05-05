@@ -165,6 +165,42 @@ def post_to_linkedin(content: str) -> None:
     print(f"✅ Posted successfully! Post ID: {post_id}")
 
 
+# ─── Send Telegram Notification ──────────────────────────────────────────────
+def send_telegram_notification(content: str) -> None:
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    run_id = os.getenv("GITHUB_RUN_ID")
+    repository = os.getenv("GITHUB_REPOSITORY")
+    
+    if not token or not chat_id:
+        print("⚠️ Telegram token or chat_id missing. Skipping notification.")
+        return
+
+    # Link directly to the GitHub Action run page for one-click approval
+    approval_url = f"https://github.com/{repository}/actions/runs/{run_id}"
+    
+    message = f"📝 *New LinkedIn Draft Ready*\n\n{content}\n\n🚀 *Review and Approve here:*"
+    
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown",
+        "reply_markup": {
+            "inline_keyboard": [[
+                {"text": "✅ REVIEW & APPROVE", "url": approval_url}
+            ]]
+        }
+    }
+    
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        print("✅ Telegram notification sent successfully!")
+    except Exception as e:
+        print(f"❌ Failed to send Telegram notification: {e}")
+
+
 # ─── Entry point ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -184,7 +220,8 @@ if __name__ == "__main__":
                 f.write(post)
                 
             write_github_summary(post)
-            print("🎉 Generation complete! Waiting for approval on GitHub.")
+            send_telegram_notification(post)
+            print("🎉 Generation complete! Waiting for approval on Telegram/GitHub.")
         except Exception as e:
             print(f"❌ Error during generation: {e}")
             exit(1)
