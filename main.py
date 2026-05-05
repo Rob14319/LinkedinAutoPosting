@@ -1,6 +1,7 @@
 import os
 import requests
 import argparse
+import time
 from google import genai
 from dotenv import load_dotenv
 from datetime import date
@@ -41,19 +42,48 @@ Instructions:
 
 Write only the post. No titles, no preamble."""
 
-    import time
-    for attempt in range(3):
-        try:
-            response = client.models.generate_content(
-                model='gemini-1.5-flash',
-                contents=prompt
-            )
-            return response.text.strip()
-        except Exception as e:
-            print(f"⚠️ API call failed on attempt {attempt + 1}: {e}")
-            if attempt == 2:
-                raise e
-            time.sleep(10)
+    # Robust model selection
+    print("🔍 Fetching available models...")
+    try:
+        available_models = [m.name for m in client.models.list()]
+        print(f"✅ Found {len(available_models)} models: {available_models}")
+    except Exception as e:
+        print(f"⚠️ Could not list models: {e}. Falling back to default names.")
+        available_models = []
+
+    # Priority list of models to try
+    model_priority = [
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-002',
+        'gemini-1.5-flash-8b',
+        'gemini-2.0-flash',
+        'gemini-1.5-pro',
+    ]
+
+    # Try each model in priority until one works
+    for model_name in model_priority:
+        # Check if model is in the available list (if we successfully fetched it)
+        if available_models:
+            full_model_path = f"models/{model_name}"
+            if full_model_path not in available_models:
+                continue
+
+        print(f"🤖 Attempting to generate with model: {model_name}...")
+        for attempt in range(2): # 2 attempts per model
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt
+                )
+                return response.text.strip()
+            except Exception as e:
+                print(f"⚠️ Attempt {attempt + 1} with {model_name} failed: {e}")
+                if "503" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    time.sleep(10)
+                    continue
+                break # Try next model if it's a 404 or other non-retriable error
+
+    raise Exception("❌ All models failed to generate content. Please check your API key and quota.")
 
 
 # ─── Write to GitHub Step Summary ──────────────────────────────────────────────
@@ -115,19 +145,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.generate:
-        print("🤖 Generating post with Gemini Flash...")
-        post = generate_post()
-        
-        print("\n--- Generated Post ---")
-        print(post)
-        print("----------------------\n")
-        
-        # Save to file so the next job can pick it up
-        with open("draft.txt", "w", encoding="utf-8") as f:
-            f.write(post)
+        print("🤖 Generating post process started...")
+        try:
+            post = generate_post()
+            print("\n--- Generated Post ---")
+            print(post)
+            print("----------------------\n")
             
-        write_github_summary(post)
-        print("🎉 Generation complete! Waiting for approval on GitHub.")
+            with open("draft.txt", "w", encoding="utf-8") as f:
+                f.write(post)
+                
+            write_github_summary(post)
+            print("🎉 Generation complete! Waiting for approval on GitHub.")
+        except Exception as e:
+            print(f"❌ Error during generation: {e}")
+            exit(1)
 
     elif args.post:
         print("📤 Reading draft from file...")
@@ -141,11 +173,6 @@ if __name__ == "__main__":
             print("❌ Error: draft.txt not found. Cannot post.")
             exit(1)
     else:
-        print("🤖 Generating post with Gemini Flash...")
+        # Default behavior: generate and post immediately
         post = generate_post()
-        print("\n--- Generated Post ---")
-        print(post)
-        print("----------------------\n")
-        print("📤 Posting to LinkedIn...")
         post_to_linkedin(post)
-        print("🎉 Done!")
