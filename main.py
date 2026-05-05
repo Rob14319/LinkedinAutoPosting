@@ -51,22 +51,21 @@ Write only the post. No titles, no preamble."""
         print(f"⚠️ Could not list models: {e}. Falling back to default names.")
         available_models = []
 
-    # Priority list of models to try
+    # Priority list of models to try (based on your actual available models list)
     model_priority = [
-        'gemini-1.5-flash',
-        'gemini-1.5-flash-002',
-        'gemini-1.5-flash-8b',
-        'gemini-2.0-flash',
-        'gemini-1.5-pro',
+        'gemini-flash-latest',
+        'gemini-flash-lite-latest',
+        'gemini-pro-latest',
+        'gemini-2.0-flash-lite',
+        'gemma-3-27b-it',
     ]
 
     # Try each model in priority until one works
     for model_name in model_priority:
-        # Check if model is in the available list (if we successfully fetched it)
-        if available_models:
-            full_model_path = f"models/{model_name}"
-            if full_model_path not in available_models:
-                continue
+        # Check if model is in the available list
+        full_model_path = f"models/{model_name}"
+        if available_models and full_model_path not in available_models:
+            continue
 
         print(f"🤖 Attempting to generate with model: {model_name}...")
         for attempt in range(2): # 2 attempts per model
@@ -78,10 +77,14 @@ Write only the post. No titles, no preamble."""
                 return response.text.strip()
             except Exception as e:
                 print(f"⚠️ Attempt {attempt + 1} with {model_name} failed: {e}")
-                if "503" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                # If it's a quota error (limit 0), don't bother retrying this model
+                if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
+                    print(f"❌ {model_name} quota exceeded. Trying next model...")
+                    break 
+                if "503" in str(e):
                     time.sleep(10)
                     continue
-                break # Try next model if it's a 404 or other non-retriable error
+                break # Try next model for other errors
 
     raise Exception("❌ All models failed to generate content. Please check your API key and quota.")
 
