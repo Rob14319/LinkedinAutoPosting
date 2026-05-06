@@ -7,7 +7,8 @@ import resend
 import sys
 from google import genai
 from dotenv import load_dotenv
-from datetime import date
+from datetime import date, datetime
+import json
 
 # Ensure console supports emojis/unicode on Windows
 if sys.platform == "win32":
@@ -35,13 +36,18 @@ def generate_post() -> str:
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     # Determine post type based on time (2 short, 2 long)
-    # 10 AM & 6 PM = Long (Story-driven)
-    # 2 PM & 11 PM = Short (Punchy/Insightful)
-    current_hour_ist = (datetime.now().hour + 5) % 24  # Simple UTC to IST approx
-    is_long = current_hour_ist in [10, 18, 15] # 15 is for manual tests
+    # 10 AM (4:30 UTC) & 6 PM (12:30 UTC) = Long (Story-driven)
+    # 2 PM (8:30 UTC) & 11 PM (17:30 UTC) = Short (Punchy/Insightful)
+    # Manual trigger usually happens around 3 PM - 4 PM IST (Slot 15)
+    current_hour_ist = (datetime.now().hour + 5) % 24
+    is_long = current_hour_ist in [10, 18, 15, 16] # Included manual test hours
     
     post_type = "Long Form Story (200-300 words)" if is_long else "Short & Punchy (50-100 words)"
     
+    # Select a fresh topic
+    import random
+    topic = random.choice(TOPICS)
+
     prompt = f"""You are a top-tier Indian Entrepreneur and Tech Visionary. 
     Your voice is natural, authoritative, and deeply relatable to the Indian business ecosystem.
 
@@ -195,11 +201,47 @@ def post_to_linkedin(content: str) -> None:
     print(f"✅ Posted successfully! Post ID: {post_id}")
 
 
+# ─── Grok Image Generation ───────────────────────────────────────────────────
+def generate_image_with_grok(post_content: str) -> str:
+    api_key = os.getenv("XAI_API_KEY")
+    if not api_key or api_key == "your_xai_api_key_here":
+        return None
+
+    print("🎨 Generating image with Grok...")
+    try:
+        # First, get a good image prompt from Gemini based on the post
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        prompt_request = f"Create a short, professional, high-quality image generation prompt for a LinkedIn post with this content: {post_content[:500]}. Style: Modern, entrepreneurial, high-tech, clean. Focus on one central object or a conceptual scene."
+        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt_request)
+        image_prompt = response.text.strip()
+
+        # Call xAI Image Generation API
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "prompt": image_prompt,
+            "model": "grok-beta", # xAI's vision/generation capable model
+            "n": 1,
+            "size": "1024x1024"
+        }
+        
+        resp = requests.post("https://api.x.ai/v1/images/generations", headers=headers, json=payload)
+        resp.raise_for_status()
+        
+        data = resp.json()
+        return data['data'][0]['url']
+    except Exception as e:
+        print(f"⚠️ Grok Image error: {e}")
+        return None
+
+
 # ─── Send Premium Email Notification ──────────────────────────────────────────
-def send_premium_email(content: str) -> None:
+def send_premium_email(content: str, image_url: str = None) -> None:
     api_key = os.getenv("RESEND_API_KEY")
     to_email = os.getenv("USER_EMAIL")
-    portal_url = os.getenv("PORTAL_URL", "http://localhost:5173") # Default to local for dev
+    portal_url = os.getenv("PORTAL_URL", "http://localhost:5173")
     
     if not api_key or not to_email:
         print("⚠️ Resend API Key or User Email missing. Skipping email notification.")
@@ -207,9 +249,13 @@ def send_premium_email(content: str) -> None:
 
     resend.api_key = api_key
 
-    # Encode content for the portal URL
-    encoded_content = base64.b64encode(content.encode('utf-8')).decode('utf-8')
-    review_link = f"{portal_url}?c={encoded_content}"
+    # Encode payload for the portal link (Complex payload: Text + Image)
+    payload = {"c": content}
+    if image_url:
+        payload["i"] = image_url
+        
+    encoded_payload = base64.b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8')
+    review_link = f"{portal_url}?p={encoded_payload}"
 
     html_content = f"""
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
@@ -221,6 +267,8 @@ def send_premium_email(content: str) -> None:
         <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #0a66c2; margin-bottom: 30px;">
             <p style="white-space: pre-wrap; color: #1e293b; line-height: 1.6; font-size: 15px;">{content}</p>
         </div>
+        
+        {f'<div style="margin-bottom: 30px;"><img src="{image_url}" style="width:100%; border-radius:12px; border: 1px solid #e2e8f0;" /></div>' if image_url else ""}
         
         <div style="text-align: center;">
             <a href="{review_link}" style="background-color: #0a66c2; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; display: inline-block;">
@@ -266,8 +314,14 @@ if __name__ == "__main__":
             with open("draft.txt", "w", encoding="utf-8") as f:
                 f.write(post)
                 
+            # Generate image for long slots
+            current_hour_ist = (datetime.now().hour + 5) % 24
+            image_url = None
+            if current_hour_ist in [10, 18, 15, 16]:
+                image_url = generate_image_with_grok(post)
+
             write_github_summary(post)
-            send_premium_email(post)
+            send_premium_email(post, image_url)
             print("🎉 Generation complete! Check your email for the review link.")
         except Exception as e:
             print(f"❌ Error during generation: {e}")

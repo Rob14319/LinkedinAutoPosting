@@ -7,18 +7,27 @@ const App = () => {
   const [content, setContent] = useState('');
   const [status, setStatus] = useState('idle'); // idle, loading, success, error
   const [error, setError] = useState('');
-  const [postUrl, setPostUrl] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
 
   useEffect(() => {
-    // Get content from URL params (base64 encoded to avoid breaking URL)
+    // Get content from URL params (p is base64 encoded JSON)
     const params = new URLSearchParams(window.location.search);
-    const encodedContent = params.get('c');
-    if (encodedContent) {
+    const p = params.get('p');
+    const c = params.get('c'); // Backward compatibility
+    
+    if (p) {
       try {
-        const decoded = atob(encodedContent);
-        setContent(decoded);
+        const decoded = JSON.parse(atob(p));
+        setContent(decoded.c || '');
+        if (decoded.i) setImageUrl(decoded.i);
       } catch (e) {
-        console.error('Failed to decode content', e);
+        console.error('Failed to decode payload', e);
+        setError('Invalid post payload in URL.');
+      }
+    } else if (c) {
+      try {
+        setContent(atob(c));
+      } catch (e) {
         setError('Invalid post content in URL.');
       }
     } else {
@@ -112,6 +121,11 @@ const App = () => {
                       </div>
                       <div className="preview-content">
                         {content || 'Generating preview...'}
+                        {imageUrl && (
+                          <div style={{ marginTop: '1rem', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <img src={imageUrl} alt="AI Generated" style={{ width: '100%', display: 'block' }} />
+                          </div>
+                        )}
                       </div>
                     </div>
 
