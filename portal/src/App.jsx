@@ -35,7 +35,8 @@ const App = () => {
     } catch (err) {
       console.error('Publish error', err);
       setStatus('error');
-      setError('Failed to publish post. Please check your GitHub configuration.');
+      const errorDetail = err.response?.data?.details?.message || err.response?.data?.message || err.message;
+      setError(`Failed to publish: ${errorDetail}`);
     }
   };
 
