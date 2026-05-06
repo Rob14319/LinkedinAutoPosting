@@ -1,12 +1,15 @@
-name: Daily LinkedIn Post
+name: LinkedIn Automation
 
 on:
   schedule:
-    - cron: '30 4 * * *'  # 10:00 AM IST (UTC+5:30)
-  workflow_dispatch:        # Allows manual trigger from GitHub UI
+    - cron: '30 4 * * *'  # 10:00 AM IST
+  workflow_dispatch:      # Manual trigger for generation
+  repository_dispatch:     # Trigger for publishing from the Portal
+    types: [publish_post]
 
 jobs:
   generate:
+    if: github.event_name != 'repository_dispatch'
     name: Generate Post & Notify
     runs-on: ubuntu-latest
     steps:
@@ -21,27 +24,20 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Generate Post and Update Summary
+      - name: Generate Post and Send Email
         run: python main.py --generate
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          USER_EMAIL: ${{ secrets.USER_EMAIL }}
+          PORTAL_URL: ${{ secrets.PORTAL_URL }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          
-      - name: Upload draft artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: post-draft
-          path: draft.txt
-          retention-days: 1
 
   publish:
+    if: github.event.action == 'publish_post'
     name: Publish to LinkedIn
-    needs: generate
     runs-on: ubuntu-latest
-    environment: Production
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -54,13 +50,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Download draft artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: post-draft
-          
       - name: Publish Post
-        run: python main.py --post
+        run: python main.py --post --content "${{ github.event.client_payload.content }}"
         env:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
           LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}

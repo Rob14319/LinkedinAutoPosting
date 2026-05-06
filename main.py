@@ -2,9 +2,17 @@ import os
 import requests
 import argparse
 import time
+import base64
+import resend
+import sys
 from google import genai
 from dotenv import load_dotenv
 from datetime import date
+
+# Ensure console supports emojis/unicode on Windows
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 load_dotenv()
 
@@ -20,6 +28,11 @@ TOPICS = [
 
 # ─── Generate post with Gemini ─────────────────────────────────────────────────
 def generate_post() -> str:
+    # Fallback for testing if API key is a placeholder
+    if os.getenv("GEMINI_API_KEY") == "your_gemini_api_key_here":
+        print("⚠️ Using Mock post because GEMINI_API_KEY is not set.")
+        return "This is a high-quality test post about entrepreneurship. It talks about the importance of consistency and building a personal brand. \n\nWhat has been your biggest lesson this year? \n\n#entrepreneurship #branding #growth"
+
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     topic = TOPICS[date.today().toordinal() % len(TOPICS)]
@@ -165,47 +178,64 @@ def post_to_linkedin(content: str) -> None:
     print(f"✅ Posted successfully! Post ID: {post_id}")
 
 
-# ─── Send Telegram Notification ──────────────────────────────────────────────
-def send_telegram_notification(content: str) -> None:
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
-    run_id = os.getenv("GITHUB_RUN_ID")
-    repository = os.getenv("GITHUB_REPOSITORY")
+# ─── Send Premium Email Notification ──────────────────────────────────────────
+def send_premium_email(content: str) -> None:
+    api_key = os.getenv("RESEND_API_KEY")
+    to_email = os.getenv("USER_EMAIL")
+    portal_url = os.getenv("PORTAL_URL", "http://localhost:5173") # Default to local for dev
     
-    if not token or not chat_id:
-        print("⚠️ Telegram token or chat_id missing. Skipping notification.")
+    if not api_key or not to_email:
+        print("⚠️ Resend API Key or User Email missing. Skipping email notification.")
         return
 
-    # Link directly to the GitHub Action run page for one-click approval
-    approval_url = f"https://github.com/{repository}/actions/runs/{run_id}"
-    
-    message = f"📝 *New LinkedIn Draft Ready*\n\n{content}\n\n🚀 *Review and Approve here:*"
-    
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": message,
-        "parse_mode": "Markdown",
-        "reply_markup": {
-            "inline_keyboard": [[
-                {"text": "✅ REVIEW & APPROVE", "url": approval_url}
-            ]]
-        }
-    }
-    
+    resend.api_key = api_key
+
+    # Encode content for the portal URL
+    encoded_content = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+    review_link = f"{portal_url}?c={encoded_content}"
+
+    html_content = f"""
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #0a66c2; margin-bottom: 5px;">🚀 Post Ready for Review</h1>
+            <p style="color: #64748b; font-size: 16px;">Your daily LinkedIn draft is generated and waiting.</p>
+        </div>
+        
+        <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #0a66c2; margin-bottom: 30px;">
+            <p style="white-space: pre-wrap; color: #1e293b; line-height: 1.6; font-size: 15px;">{content}</p>
+        </div>
+        
+        <div style="text-align: center;">
+            <a href="{review_link}" style="background-color: #0a66c2; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; display: inline-block;">
+                Review & Publish Now
+            </a>
+        </div>
+        
+        <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center; color: #94a3b8; font-size: 12px;">
+            <p>Sent by Antigravity LinkedIn Agent • Automated Content System</p>
+        </div>
+    </div>
+    """
+
     try:
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-        print("✅ Telegram notification sent successfully!")
+        params = {
+            "from": "LinkedIn Agent <onboarding@resend.dev>",
+            "to": [to_email],
+            "subject": "📝 Review your LinkedIn Post for Today",
+            "html": html_content,
+        }
+        resend.Emails.send(params)
+        print(f"✅ Premium review email sent to {to_email}!")
     except Exception as e:
-        print(f"❌ Failed to send Telegram notification: {e}")
+        print(f"❌ Failed to send email: {e}")
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--generate', action='store_true', help='Generate post and add to GitHub Summary')
-    parser.add_argument('--post', action='store_true', help='Publish the post from draft file to LinkedIn')
+    parser.add_argument('--generate', action='store_true', help='Generate post and send review email')
+    parser.add_argument('--post', action='store_true', help='Publish the post to LinkedIn')
+    parser.add_argument('--content', type=str, help='Direct content to post (overrides draft.txt)')
     args = parser.parse_args()
 
     if args.generate:
@@ -220,22 +250,26 @@ if __name__ == "__main__":
                 f.write(post)
                 
             write_github_summary(post)
-            send_telegram_notification(post)
-            print("🎉 Generation complete! Waiting for approval on Telegram/GitHub.")
+            send_premium_email(post)
+            print("🎉 Generation complete! Check your email for the review link.")
         except Exception as e:
             print(f"❌ Error during generation: {e}")
             exit(1)
 
     elif args.post:
-        print("📤 Reading draft from file...")
+        print("📤 Preparing to post...")
         try:
-            with open("draft.txt", "r", encoding="utf-8") as f:
-                post = f.read()
+            if args.content:
+                post = args.content
+            else:
+                with open("draft.txt", "r", encoding="utf-8") as f:
+                    post = f.read()
+            
             print("🚀 Posting to LinkedIn...")
             post_to_linkedin(post)
             print("🎉 Done!")
-        except FileNotFoundError:
-            print("❌ Error: draft.txt not found. Cannot post.")
+        except Exception as e:
+            print(f"❌ Error during posting: {e}")
             exit(1)
     else:
         # Default behavior: generate and post immediately
