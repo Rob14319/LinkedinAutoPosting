@@ -40,7 +40,7 @@ def generate_post() -> str:
     # 2 PM (8:30 UTC) & 11 PM (17:30 UTC) = Short (Punchy/Insightful)
     # Manual trigger usually happens around 3 PM - 4 PM IST (Slot 15)
     current_hour_ist = (datetime.now().hour + 5) % 24
-    is_long = current_hour_ist in [10, 18, 15, 16] # Included manual test hours
+    is_long = current_hour_ist in [10, 18, 15, 16, 17, 19] # Included manual test hours
     
     post_type = "Long Form Story (200-300 words)" if is_long else "Short & Punchy (50-100 words)"
     
