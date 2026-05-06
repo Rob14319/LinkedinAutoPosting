@@ -28,11 +28,6 @@ TOPICS = [
 
 # ─── Generate post with Gemini ─────────────────────────────────────────────────
 def generate_post() -> str:
-    # Fallback for testing if API key is a placeholder
-    if os.getenv("GEMINI_API_KEY") == "your_gemini_api_key_here":
-        print("⚠️ Using Mock post because GEMINI_API_KEY is not set.")
-        return "This is a high-quality test post about entrepreneurship. It talks about the importance of consistency and building a personal brand. \n\nWhat has been your biggest lesson this year? \n\n#entrepreneurship #branding #growth"
-
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     topic = TOPICS[date.today().toordinal() % len(TOPICS)]
