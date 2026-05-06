@@ -6,9 +6,11 @@ export default async function handler(req, res) {
   }
 
   const { content } = req.body;
-  const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-  const REPO_OWNER = process.env.REPO_OWNER;
-  const REPO_NAME = process.env.REPO_NAME;
+  const GITHUB_TOKEN = (process.env.GITHUB_TOKEN || '').trim();
+  const REPO_OWNER = (process.env.REPO_OWNER || '').trim();
+  const REPO_NAME = (process.env.REPO_NAME || '').trim();
+
+  console.log(`Targeting: ${REPO_OWNER}/${REPO_NAME}`);
 
   if (!GITHUB_TOKEN || !REPO_OWNER || !REPO_NAME) {
     return res.status(500).json({ message: 'Server configuration missing' });
