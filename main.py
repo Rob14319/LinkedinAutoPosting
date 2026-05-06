@@ -18,12 +18,16 @@ load_dotenv()
 
 # ─── Topics rotation ───────────────────────────────────────────────────────────
 TOPICS = [
+    "recent AI breakthroughs and their impact on small business productivity",
     "a lesson I learned about entrepreneurship the hard way",
-    "why personal branding is more than just a buzzword",
-    "a digital marketing strategy that completely surprised me",
+    "why personal branding is more than just a buzzword in the age of AI",
+    "the most surprising digital marketing trend of this week",
     "what building a digital presence taught me about consistency",
-    "how marketing automation saved my sanity",
-    "a real-world application of AI that changed how I work",
+    "how marketing automation and AI agents are saving founders' time",
+    "a real-world application of Generative AI that changed how I work",
+    "new tech trends that entrepreneurs should watch this quarter",
+    "the intersection of branding and tech: how to stay human in a digital world",
+    "why modern founders must be tech-first to survive the next decade",
 ]
 
 # ─── Generate post with Gemini ─────────────────────────────────────────────────
@@ -32,23 +36,27 @@ def generate_post() -> str:
 
     topic = TOPICS[date.today().toordinal() % len(TOPICS)]
 
-    prompt = f"""You are writing a LinkedIn post for a business founder and entrepreneur.
+    prompt = f"""You are writing a LinkedIn post for a high-level business founder and tech-savvy entrepreneur.
+    
+    Topic: {topic}
+    
+    RESEARCH REQUIREMENT:
+    Please search for the latest news and trends (from the last 24-48 hours) related to {topic} and {', '.join(TOPICS[:3])}. 
+    Incorporate one specific recent development or insight into the post to make it timely and authoritative.
 
-Topic: {topic}
+    Instructions:
+    - Write in first person, storytelling style — personal, honest, and human.
+    - Start with a single compelling sentence that hooks the reader.
+    - Tell a short story or share a specific recent trend/insight — make it feel real.
+    - Share one clear lesson or actionable takeaway that emerges from the trend.
+    - End with a short, genuine question that invites others to share their experience.
+    - Use short paragraphs (1-2 sentences each) for easy reading on mobile.
+    - Total length: 150-220 words.
+    - Add 3-4 relevant hashtags at the very end.
+    - Do NOT use bullet points, emojis, or corporate jargon.
+    - Sound like a real person sharing a 'hot take' or a 'learned lesson'.
 
-Instructions:
-- Write in first person, storytelling style — personal, honest, and human
-- Start with a single compelling sentence that hooks the reader (no "I'm excited to share" openers)
-- Tell a short story or specific moment — make it feel real, not generic
-- Share one clear insight or lesson that emerges naturally from the story
-- End with a short, genuine question that invites others to share their experience
-- Use short paragraphs (1-2 sentences each) for easy reading on mobile
-- Total length: 180-250 words
-- Add 3-4 relevant hashtags at the very end on their own line
-- Do NOT use bullet points, emojis, or corporate jargon
-- Sound like a real person, not a content marketer
-
-Write only the post. No titles, no preamble."""
+    Write only the post. No titles, no preamble."""
 
     # Robust model selection
     print("🔍 Fetching available models...")
@@ -76,11 +84,17 @@ Write only the post. No titles, no preamble."""
     print(f"📋 Will attempt these models in order: {models_to_try}")
 
     for model_name in models_to_try:
-        print(f"🤖 Attempting to generate with model: {model_name}...")
+        print(f"🤖 Attempting to generate with model: {model_name} (with Search Grounding)...")
         try:
+            # Configure search tools
+            config = {
+                'tools': [{'google_search': {}}]
+            }
+
             response = client.models.generate_content(
                 model=model_name,
-                contents=prompt
+                contents=prompt,
+                config=config
             )
             return response.text.strip()
         except Exception as e:

@@ -3,6 +3,8 @@ name: LinkedIn Automation
 on:
   schedule:
     - cron: '30 4 * * *'  # 10:00 AM IST
+    - cron: '30 9 * * *'  # 3:00 PM IST
+    - cron: '30 14 * * *' # 8:00 PM IST
   workflow_dispatch:      # Manual trigger for generation
   repository_dispatch:     # Trigger for publishing from the Portal
     types: [publish_post]
