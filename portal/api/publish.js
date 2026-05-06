@@ -23,15 +23,20 @@ export default async function handler(req, res) {
       },
       {
         headers: {
-          Authorization: `Bearer ${GITHUB_TOKEN}`,
-          Accept: 'application/vnd.github.v3+json'
+          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'Vercel-Serverless-Function'
         }
       }
     );
 
     res.status(200).json({ message: 'Success' });
   } catch (error) {
-    console.error('GitHub API error:', error.response?.data || error.message);
-    res.status(500).json({ message: 'Failed to trigger GitHub Action' });
+    const errorData = error.response?.data || error.message;
+    console.error('GitHub API error:', errorData);
+    res.status(500).json({ 
+      message: 'Failed to trigger GitHub Action',
+      details: errorData 
+    });
   }
 }
