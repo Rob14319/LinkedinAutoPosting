@@ -85,10 +85,7 @@ const App = () => {
                   Your story is now live. Check the impact on LinkedIn!
                 </p>
                 <div style={{ display: 'flex', gap: '1.5rem', justifyContent: 'center' }}>
-                  <a href={postUrl} target="_blank" rel="noreferrer" className="premium-button" style={{ padding: '1.2rem 2.5rem' }}>
-                    View Live Post <ArrowRight size={20} />
-                  </a>
-                  <button onClick={() => setStatus('idle')} className="premium-button" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
+                  <button onClick={() => setStatus('idle')} className="premium-button" style={{ padding: '1.2rem 2.5rem' }}>
                     Done
                   </button>
                 </div>
