@@ -40,7 +40,6 @@ const App = () => {
     try {
       await axios.post('/api/publish', { content });
       setStatus('success');
-      setPostUrl('https://www.linkedin.com/feed/');
     } catch (err) {
       console.error('Publish error', err);
       setStatus('error');
