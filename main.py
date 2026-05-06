@@ -18,43 +18,51 @@ load_dotenv()
 
 # ─── Topics rotation ───────────────────────────────────────────────────────────
 TOPICS = [
-    "recent AI breakthroughs and their impact on small business productivity",
-    "a lesson I learned about entrepreneurship the hard way",
-    "why personal branding is more than just a buzzword in the age of AI",
-    "the most surprising digital marketing trend of this week",
-    "what building a digital presence taught me about consistency",
-    "how marketing automation and AI agents are saving founders' time",
-    "a real-world application of Generative AI that changed how I work",
-    "new tech trends that entrepreneurs should watch this quarter",
-    "the intersection of branding and tech: how to stay human in a digital world",
-    "why modern founders must be tech-first to survive the next decade",
+    "recent AI breakthroughs in India's tech ecosystem",
+    "the reality of scaling a startup in Mumbai/Bangalore",
+    "why Indian founders should prioritize global personal branding",
+    "decoding the latest marketing trend seen in Indian D2C brands",
+    "lessons from a failed pivot in my entrepreneurial journey",
+    "how AI agents are disrupting traditional SaaS workflows in India",
+    "the future of Tech in the Indian market: 2025 and beyond",
+    "building a brand that resonates with both Gen Z and traditional Indian businesses",
+    "what Silicon Valley can learn from Indian 'Jugaad' innovation",
+    "the impact of open-source AI on Indian software engineering",
 ]
 
 # ─── Generate post with Gemini ─────────────────────────────────────────────────
 def generate_post() -> str:
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-    topic = TOPICS[date.today().toordinal() % len(TOPICS)]
+    # Determine post type based on time (2 short, 2 long)
+    # 10 AM & 6 PM = Long (Story-driven)
+    # 2 PM & 11 PM = Short (Punchy/Insightful)
+    current_hour_ist = (datetime.now().hour + 5) % 24  # Simple UTC to IST approx
+    is_long = current_hour_ist in [10, 18, 15] # 15 is for manual tests
+    
+    post_type = "Long Form Story (200-300 words)" if is_long else "Short & Punchy (50-100 words)"
+    
+    prompt = f"""You are a top-tier Indian Entrepreneur and Tech Visionary. 
+    Your voice is natural, authoritative, and deeply relatable to the Indian business ecosystem.
 
-    prompt = f"""You are writing a LinkedIn post for a high-level business founder and tech-savvy entrepreneur.
-    
     Topic: {topic}
-    
+    Post Type: {post_type}
+
+    PERSONA GUIDELINES:
+    - You are an Indian founder. Use subtle cultural context (Bangalore tech, Mumbai hustle, etc.) where natural.
+    - Mention relevant brands, organizations, or tech frameworks (e.g., NVIDIA, OpenAI, Zomato, Reliance, etc.) if they align with the trend.
+    - Avoid "corporate speak." Sound like you're talking to a peer over coffee.
+
     RESEARCH REQUIREMENT:
-    Please search for the latest news and trends (from the last 24-48 hours) related to {topic} and {', '.join(TOPICS[:3])}. 
-    Incorporate one specific recent development or insight into the post to make it timely and authoritative.
+    Please search for the latest news and trends (from the last 24 hours) related to {topic}. 
+    Incorporate one specific recent development or insight to make it authoritative.
 
     Instructions:
-    - Write in first person, storytelling style — personal, honest, and human.
-    - Start with a single compelling sentence that hooks the reader.
-    - Tell a short story or share a specific recent trend/insight — make it feel real.
-    - Share one clear lesson or actionable takeaway that emerges from the trend.
-    - End with a short, genuine question that invites others to share their experience.
-    - Use short paragraphs (1-2 sentences each) for easy reading on mobile.
-    - Total length: 150-220 words.
-    - Add 3-4 relevant hashtags at the very end.
-    - Do NOT use bullet points, emojis, or corporate jargon.
-    - Sound like a real person sharing a 'hot take' or a 'learned lesson'.
+    - Start with a strong 'hook' sentence.
+    - {f"Tell a story or share a detailed lesson. Use 1-2 sentence paragraphs." if is_long else "Be direct, punchy, and share a quick hot take."}
+    - Share one clear, actionable takeaway.
+    - End with a genuine, short question.
+    - Use 3-4 hashtags. No emojis. Short paragraphs only.
 
     Write only the post. No titles, no preamble."""
 
