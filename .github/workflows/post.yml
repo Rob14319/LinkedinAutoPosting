@@ -12,8 +12,8 @@ on:
 
 jobs:
   generate:
-    # Run only at 10:00 AM IST (4:30 AM UTC)
-    if: (github.event_name == 'schedule' && github.event.schedule == '30 4 * * *') || github.event_name == 'workflow_dispatch'
+    # Run only at 10:00 AM IST (4:30 AM UTC) and 6:00 PM IST (12:30 PM UTC)
+    if: (github.event_name == 'schedule' && (github.event.schedule == '30 4 * * *' || github.event.schedule == '0 13 * * *')) || github.event_name == 'workflow_dispatch'
     name: Generate Post & Notify
     runs-on: ubuntu-latest
     steps:
