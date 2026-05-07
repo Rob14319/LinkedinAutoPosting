@@ -125,3 +125,57 @@ body {
 .animate-fade-in {
   animation: fadeIn 0.6s ease-out forwards;
 }
+
+/* New Edit Styles */
+.premium-textarea {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--text-main);
+  padding: 1rem;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.6;
+  resize: vertical;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.premium-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.comment-textarea {
+  background: rgba(30, 41, 59, 0.4);
+  font-size: 0.9rem;
+}
+
+/* Comment Preview */
+.comment-preview {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f0f2f5;
+}
+
+.avatar.small {
+  width: 32px;
+  height: 32px;
+}
+
+.comment-bubble {
+  background: #f2f2f2;
+  border-radius: 0 8px 8px 8px;
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  flex: 1;
+}
+
+.comment-bubble p:first-child {
+  font-size: 0.75rem;
+  margin-bottom: 0.25rem;
+}

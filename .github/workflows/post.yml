@@ -8,11 +8,12 @@ on:
     - cron: '30 17 * * *' # 11:00 PM IST
   workflow_dispatch:      # Manual trigger for generation
   repository_dispatch:     # Trigger for publishing from the Portal
-    types: [publish_post]
+    types: [publish_post, publish_comment]
 
 jobs:
   generate:
-    if: github.event_name != 'repository_dispatch'
+    # Run only at 10:00 AM IST (4:30 AM UTC)
+    if: (github.event_name == 'schedule' && github.event.schedule == '30 4 * * *') || github.event_name == 'workflow_dispatch'
     name: Generate Post & Notify
     runs-on: ubuntu-latest
     steps:
@@ -54,7 +55,39 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Publish Post
-        run: python main.py --post --content "${{ github.event.client_payload.content }}"
+        run: python main.py --post --content "${{ github.event.client_payload.content }}" --comment "${{ github.event.client_payload.comment }}"
+        env:
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
+
+  engage:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    name: Discover & Draft Engagement
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python main.py --engage
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          USER_EMAIL: ${{ secrets.USER_EMAIL }}
+          PORTAL_URL: ${{ secrets.PORTAL_URL }}
+
+  comment:
+    if: github.event.action == 'publish_comment'
+    name: Post Comment to Target
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python main.py --post --comment "${{ github.event.client_payload.comment }}" --activity_id "${{ github.event.client_payload.activityId }}"
         env:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
           LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}

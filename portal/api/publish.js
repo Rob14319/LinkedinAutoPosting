@@ -5,23 +5,25 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const { content } = req.body;
+  const { content, comment, type, activityId } = req.body;
   const GITHUB_TOKEN = (process.env.GITHUB_TOKEN || '').trim();
   const REPO_OWNER = (process.env.REPO_OWNER || '').trim();
   const REPO_NAME = (process.env.REPO_NAME || '').trim();
 
-  console.log(`Targeting: ${REPO_OWNER}/${REPO_NAME}`);
+  console.log(`Targeting: ${REPO_OWNER}/${REPO_NAME} (Type: ${type || 'post'})`);
 
   if (!GITHUB_TOKEN || !REPO_OWNER || !REPO_NAME) {
     return res.status(500).json({ message: 'Server configuration missing' });
   }
 
   try {
+    const eventType = type === 'engagement' ? 'publish_comment' : 'publish_post';
+    
     await axios.post(
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/dispatches`,
       {
-        event_type: 'publish_post',
-        client_payload: { content }
+        event_type: eventType,
+        client_payload: { content, comment, activityId, type }
       },
       {
         headers: {
