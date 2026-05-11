@@ -202,40 +202,7 @@ def post_to_linkedin(content: str) -> str:
     post_id = response.json().get("id", "unknown")
     print(f"✅ Posted successfully! Post ID: {post_id}")
     return post_id
-<<<<<<< Updated upstream
 
-# ─── Post Comment to LinkedIn ────────────────────────────────────────────────
-def post_comment_to_linkedin(post_id: str, comment: str) -> None:
-    token = os.getenv("LINKEDIN_ACCESS_TOKEN")
-    urn = os.getenv("LINKEDIN_PERSON_URN")
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "X-Restli-Protocol-Version": "2.0.0",
-    }
-
-    payload = {
-        "actor": urn,
-        "object": post_id,
-        "message": {
-            "text": comment
-        }
-    }
-
-    import urllib.parse
-    encoded_post_id = urllib.parse.quote(post_id)
-    
-    print(f"💬 Posting first comment to: {post_id}...")
-    response = requests.post(
-        f"https://api.linkedin.com/v2/socialActions/{encoded_post_id}/comments",
-        headers=headers,
-        json=payload,
-    )
-    response.raise_for_status()
-    print("✅ Comment posted successfully!")
-=======
->>>>>>> Stashed changes
 
 
 # ─── Grok Image Generation ───────────────────────────────────────────────────
@@ -487,9 +454,12 @@ def post_comment_to_linkedin(post_id: str, comment: str) -> None:
         }
     }
 
+    import urllib.parse
+    encoded_post_id = urllib.parse.quote(post_id)
+
     try:
         response = requests.post(
-            f"https://api.linkedin.com/v2/socialActions/{post_id}/comments",
+            f"https://api.linkedin.com/v2/socialActions/{encoded_post_id}/comments",
             headers=headers,
             json=payload,
         )
@@ -610,7 +580,6 @@ if __name__ == "__main__":
                 print(f"🚀 Engagement: Commenting on external activity {args.activity_id}...")
                 post_comment_to_linkedin(f"urn:li:activity:{args.activity_id}", args.comment)
             else:
-<<<<<<< Updated upstream
                 # Normal posting flow
                 if args.content:
                     post = args.content
@@ -621,29 +590,19 @@ if __name__ == "__main__":
                 print("🚀 Posting to LinkedIn...")
                 post_id = post_to_linkedin(post)
                 
-                # Post comment if provided
+                # Post comment
+                print("⏳ Waiting 3s before posting comment...")
+                time.sleep(3)
+                
                 if args.comment:
-                    # Add a small delay to ensure the post is indexed
-                    print("⏳ Waiting 3s before posting comment...")
-                    time.sleep(3)
-                    try:
-                        post_comment_to_linkedin(post_id, args.comment)
-                    except Exception as ce:
-                        print(f"⚠️ Failed to post comment: {ce}")
-                    
-=======
-                with open("draft.txt", "r", encoding="utf-8") as f:
-                    post = f.read()
-            
-            print("🚀 Posting to LinkedIn...")
-            post_id = post_to_linkedin(post)
-            
-            print("💬 Posting comment...")
-            comment = generate_comment(post)
-            post_comment_to_linkedin(post_id, comment)
-            
-            send_twilio_notification(f"✅ LinkedIn Post Published Successfully!\nPost ID: {post_id}\nComment: {comment}")
->>>>>>> Stashed changes
+                    comment = args.comment
+                else:
+                    print("💬 Generating comment...")
+                    comment = generate_comment(post)
+                
+                post_comment_to_linkedin(post_id, comment)
+                
+                send_twilio_notification(f"✅ LinkedIn Post Published Successfully!\nPost ID: {post_id}\nComment: {comment}")
             print("🎉 Done!")
         except Exception as e:
             error_msg = f"❌ LinkedIn Posting Failed: {e}"
