@@ -7,8 +7,10 @@ import resend
 import sys
 from google import genai
 from dotenv import load_dotenv
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import json
+from twilio.rest import Client
+import traceback
 
 # Ensure console supports emojis/unicode on Windows
 if sys.platform == "win32":
@@ -41,7 +43,7 @@ def generate_post() -> str:
     # 10 AM (4:30 UTC) & 6 PM (12:30 UTC) = Long (Story-driven)
     # 2 PM (8:30 UTC) & 11 PM (17:30 UTC) = Short (Punchy/Insightful)
     # Manual trigger usually happens around 3 PM - 4 PM IST (Slot 15)
-    current_hour_ist = (datetime.now().hour + 5) % 24
+    current_hour_ist = (datetime.utcnow() + timedelta(hours=5, minutes=30)).hour
     is_long = current_hour_ist in [10, 18, 15, 16, 17, 19] # Included manual test hours
     
     post_type = "Long Form Story (200-300 words)" if is_long else "Short & Punchy (50-100 words)"
@@ -130,8 +132,6 @@ def generate_post() -> str:
             # Otherwise, just move to the next model in the list
             continue
 
-    raise Exception("❌ All available models failed. Your API key might have 0 quota for all generation models.")
-
     raise Exception("❌ All models failed to generate content. Please check your API key and quota.")
 
 
@@ -169,7 +169,7 @@ def write_github_summary(content: str) -> None:
 
 
 # ─── Post to LinkedIn ──────────────────────────────────────────────────────────
-def post_to_linkedin(content: str) -> None:
+def post_to_linkedin(content: str) -> str:
     token = os.getenv("LINKEDIN_ACCESS_TOKEN")
     urn = os.getenv("LINKEDIN_PERSON_URN")
 
@@ -202,6 +202,7 @@ def post_to_linkedin(content: str) -> None:
     post_id = response.json().get("id", "unknown")
     print(f"✅ Posted successfully! Post ID: {post_id}")
     return post_id
+<<<<<<< Updated upstream
 
 # ─── Post Comment to LinkedIn ────────────────────────────────────────────────
 def post_comment_to_linkedin(post_id: str, comment: str) -> None:
@@ -233,6 +234,8 @@ def post_comment_to_linkedin(post_id: str, comment: str) -> None:
     )
     response.raise_for_status()
     print("✅ Comment posted successfully!")
+=======
+>>>>>>> Stashed changes
 
 
 # ─── Grok Image Generation ───────────────────────────────────────────────────
@@ -443,6 +446,87 @@ def send_premium_email(content: str, image_url: str = None) -> None:
         print(f"❌ Failed to send email: {e}")
 
 
+# ─── Generate Comment with Gemini ──────────────────────────────────────────────
+def generate_comment(post_content: str) -> str:
+    print("🤖 Generating comment...")
+    try:
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        prompt = f"""You are the author of this LinkedIn post. Write a short, engaging follow-up comment to post on your own post immediately after publishing. 
+        It should ask a question to the audience or share one extra tiny insight to kickstart engagement.
+        Keep it under 3 sentences. No hashtags. No emojis.
+        
+        Post Content:
+        {post_content}
+        """
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
+        return response.text.strip()
+    except Exception as e:
+        print(f"⚠️ Comment generation failed: {e}")
+        return "Would love to hear your thoughts on this! Drop a comment below 👇"
+
+
+# ─── Post Comment to LinkedIn ──────────────────────────────────────────────────
+def post_comment_to_linkedin(post_id: str, comment: str) -> None:
+    token = os.getenv("LINKEDIN_ACCESS_TOKEN")
+    urn = os.getenv("LINKEDIN_PERSON_URN")
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "X-Restli-Protocol-Version": "2.0.0",
+    }
+
+    payload = {
+        "actor": urn,
+        "object": post_id,
+        "message": {
+            "text": comment
+        }
+    }
+
+    try:
+        response = requests.post(
+            f"https://api.linkedin.com/v2/socialActions/{post_id}/comments",
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        print(f"✅ Comment posted successfully!")
+    except Exception as e:
+        print(f"❌ Failed to post comment: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"   Response: {e.response.text}")
+
+
+# ─── Send Twilio Notification ─────────────────────────────────────────────────
+def send_twilio_notification(message: str) -> None:
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    from_number = os.getenv("TWILIO_PHONE_NUMBER")
+    to_number = os.getenv("TWILIO_TO_NUMBER")
+
+    if not all([account_sid, auth_token, from_number, to_number]):
+        print("⚠️ Twilio credentials missing. Skipping SMS/WhatsApp notification.")
+        return
+
+    try:
+        client = Client(account_sid, auth_token)
+        if from_number.startswith("whatsapp:") and not to_number.startswith("whatsapp:"):
+            to_number = f"whatsapp:{to_number}"
+            
+        msg = client.messages.create(
+            body=message,
+            from_=from_number,
+            to=to_number
+        )
+        print(f"✅ Twilio notification sent! Message SID: {msg.sid}")
+    except Exception as e:
+        print(f"❌ Failed to send Twilio notification: {e}")
+
+
 # ─── Entry point ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -466,16 +550,24 @@ if __name__ == "__main__":
                 f.write(post)
                 
             # Generate image for long slots
-            current_hour_ist = (datetime.now().hour + 5) % 24
+            current_hour_ist = (datetime.utcnow() + timedelta(hours=5, minutes=30)).hour
             image_url = None
             if current_hour_ist in [10, 18, 15, 16]:
                 image_url = generate_image_with_grok(post)
 
             write_github_summary(post)
             send_premium_email(post, image_url)
+            
+            # Send Twilio Notification
+            portal_url = os.getenv("PORTAL_URL", "http://localhost:5173")
+            send_twilio_notification(f"📝 LinkedIn Draft Ready for Review!\nReview here: {portal_url}")
+            
             print("🎉 Generation complete! Check your email for the review link.")
         except Exception as e:
-            print(f"❌ Error during generation: {e}")
+            error_msg = f"❌ LinkedIn Generation Failed: {e}"
+            print(error_msg)
+            print(traceback.format_exc())
+            send_twilio_notification(error_msg)
             exit(1)
 
     elif args.engage:
@@ -518,6 +610,7 @@ if __name__ == "__main__":
                 print(f"🚀 Engagement: Commenting on external activity {args.activity_id}...")
                 post_comment_to_linkedin(f"urn:li:activity:{args.activity_id}", args.comment)
             else:
+<<<<<<< Updated upstream
                 # Normal posting flow
                 if args.content:
                     post = args.content
@@ -538,11 +631,37 @@ if __name__ == "__main__":
                     except Exception as ce:
                         print(f"⚠️ Failed to post comment: {ce}")
                     
+=======
+                with open("draft.txt", "r", encoding="utf-8") as f:
+                    post = f.read()
+            
+            print("🚀 Posting to LinkedIn...")
+            post_id = post_to_linkedin(post)
+            
+            print("💬 Posting comment...")
+            comment = generate_comment(post)
+            post_comment_to_linkedin(post_id, comment)
+            
+            send_twilio_notification(f"✅ LinkedIn Post Published Successfully!\nPost ID: {post_id}\nComment: {comment}")
+>>>>>>> Stashed changes
             print("🎉 Done!")
         except Exception as e:
-            print(f"❌ Error during posting: {e}")
+            error_msg = f"❌ LinkedIn Posting Failed: {e}"
+            print(error_msg)
+            print(traceback.format_exc())
+            send_twilio_notification(error_msg)
             exit(1)
     else:
         # Default behavior: generate and post immediately
-        post = generate_post()
-        post_to_linkedin(post)
+        try:
+            post = generate_post()
+            post_id = post_to_linkedin(post)
+            comment = generate_comment(post)
+            post_comment_to_linkedin(post_id, comment)
+            send_twilio_notification(f"✅ Auto LinkedIn Post Published!\nPost ID: {post_id}")
+        except Exception as e:
+            error_msg = f"❌ Auto LinkedIn Process Failed: {e}"
+            print(error_msg)
+            print(traceback.format_exc())
+            send_twilio_notification(error_msg)
+            exit(1)
