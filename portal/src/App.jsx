@@ -23,7 +23,7 @@ const App = () => {
     
     if (p) {
       try {
-        const decoded = JSON.parse(atob(p));
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(p))));
         if (decoded.t === 'engagement') {
           setPayloadType('engagement');
           setComment(decoded.c || '');

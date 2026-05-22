@@ -324,7 +324,8 @@ def send_comment_review_email(post_url: str, comment: str) -> None:
     }
     
     encoded_payload = base64.b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8')
-    review_link = f"{portal_url}?p={urllib.parse.quote(encoded_payload, safe='')}"
+    portal_url_clean = portal_url if portal_url.endswith('/') else f"{portal_url}/"
+    review_link = f"{portal_url_clean}?p={urllib.parse.quote(encoded_payload, safe='')}"
 
     html_content = f"""
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
@@ -375,7 +376,8 @@ def send_premium_email(content: str, image_url: str = None) -> None:
         payload["i"] = image_url
         
     encoded_payload = base64.b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8')
-    review_link = f"{portal_url}?p={urllib.parse.quote(encoded_payload, safe='')}"
+    portal_url_clean = portal_url if portal_url.endswith('/') else f"{portal_url}/"
+    review_link = f"{portal_url_clean}?p={urllib.parse.quote(encoded_payload, safe='')}"
 
     html_content = f"""
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
