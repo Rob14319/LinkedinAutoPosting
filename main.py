@@ -753,14 +753,24 @@ if __name__ == "__main__":
     elif args.post:
         print("📤 Preparing to post...")
         try:
-            if args.activity_id:
+            # Fallbacks from environment variables to prevent shell argument quote breakage
+            content_env = os.getenv("POST_CONTENT")
+            comment_env = os.getenv("POST_COMMENT")
+            activity_id_env = os.getenv("POST_ACTIVITY_ID")
+            
+            activity_id = args.activity_id or activity_id_env
+            comment = args.comment or comment_env
+            
+            if activity_id:
                 # Commenting on an external post
-                print(f"🚀 Engagement: Commenting on external activity {args.activity_id}...")
-                post_comment_to_linkedin(f"urn:li:activity:{args.activity_id}", args.comment)
+                print(f"🚀 Engagement: Commenting on external activity {activity_id}...")
+                post_comment_to_linkedin(f"urn:li:activity:{activity_id}", comment)
             else:
                 # Normal posting flow
                 if args.content:
                     post = args.content
+                elif content_env:
+                    post = content_env
                 else:
                     with open("draft.txt", "r", encoding="utf-8") as f:
                         post = f.read()
@@ -769,12 +779,12 @@ if __name__ == "__main__":
                 post_id = post_to_linkedin(post)
                 
                 # Post comment (only if explicitly provided)
-                if args.comment and args.comment.strip():
+                if comment and comment.strip():
                     print("⏳ Waiting 3s before posting comment...")
                     time.sleep(3)
-                    print(f"💬 Posting comment: {args.comment}")
-                    post_comment_to_linkedin(post_id, args.comment.strip())
-                    notification_msg = f"✅ LinkedIn Post Published Successfully!\nPost ID: {post_id}\nComment: {args.comment.strip()}"
+                    print(f"💬 Posting comment: {comment}")
+                    post_comment_to_linkedin(post_id, comment.strip())
+                    notification_msg = f"✅ LinkedIn Post Published Successfully!\nPost ID: {post_id}\nComment: {comment.strip()}"
                 else:
                     print("💬 No first comment provided. Skipping self-commenting.")
                     notification_msg = f"✅ LinkedIn Post Published Successfully!\nPost ID: {post_id}"
