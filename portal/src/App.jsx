@@ -240,7 +240,7 @@ const App = () => {
                     <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
                       <button 
                         onClick={handlePublish}
-                        disabled={status === 'loading' || !content}
+                        disabled={status === 'loading' || (payloadType === 'engagement' ? !comment : !content)}
                         className="premium-button"
                         style={{ flex: 1, justifyContent: 'center' }}
                       >
