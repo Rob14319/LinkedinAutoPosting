@@ -323,9 +323,9 @@ def send_comment_review_email(post_url: str, comment: str) -> None:
         "url": post_url
     }
     
-    encoded_payload = base64.b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8')
+    encoded_payload = base64.urlsafe_b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8')
     portal_url_clean = portal_url if portal_url.endswith('/') else f"{portal_url}/"
-    review_link = f"{portal_url_clean}?p={urllib.parse.quote(encoded_payload, safe='')}"
+    review_link = f"{portal_url_clean}review/{encoded_payload}"
 
     html_content = f"""
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
@@ -359,14 +359,14 @@ def send_comment_review_email(post_url: str, comment: str) -> None:
 
 
 # ─── Send Premium Email Notification ──────────────────────────────────────────
-def send_premium_email(content: str, image_url: str = None) -> None:
+def send_premium_email(content: str, image_url: str = None) -> str:
     api_key = os.getenv("RESEND_API_KEY")
     to_email = os.getenv("USER_EMAIL")
     portal_url = os.getenv("PORTAL_URL", "http://localhost:5173")
     
     if not api_key or not to_email:
         print("⚠️ Resend API Key or User Email missing. Skipping email notification.")
-        return
+        return None
 
     resend.api_key = api_key
 
@@ -375,9 +375,9 @@ def send_premium_email(content: str, image_url: str = None) -> None:
     if image_url:
         payload["i"] = image_url
         
-    encoded_payload = base64.b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8')
+    encoded_payload = base64.urlsafe_b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8')
     portal_url_clean = portal_url if portal_url.endswith('/') else f"{portal_url}/"
-    review_link = f"{portal_url_clean}?p={urllib.parse.quote(encoded_payload, safe='')}"
+    review_link = f"{portal_url_clean}review/{encoded_payload}"
 
     html_content = f"""
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
@@ -413,8 +413,10 @@ def send_premium_email(content: str, image_url: str = None) -> None:
         }
         resend.Emails.send(params)
         print(f"✅ Premium review email sent to {to_email}!")
+        return review_link
     except Exception as e:
         print(f"❌ Failed to send email: {e}")
+        return review_link
 
 
 # ─── Generate Comment with Gemini ──────────────────────────────────────────────
@@ -695,11 +697,11 @@ if __name__ == "__main__":
                 image_url = generate_image_with_grok(post)
 
             write_github_summary(post)
-            send_premium_email(post, image_url)
+            review_link = send_premium_email(post, image_url)
             
             # Send Twilio Notification
             portal_url = os.getenv("PORTAL_URL", "http://localhost:5173")
-            send_twilio_notification(f"📝 LinkedIn Draft Ready for Review!\nReview here: {portal_url}")
+            send_twilio_notification(f"📝 LinkedIn Draft Ready for Review!\nReview here: {review_link or portal_url}")
             
             print("🎉 Generation complete! Check your email for the review link.")
         except Exception as e:

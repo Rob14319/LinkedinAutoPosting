@@ -16,14 +16,34 @@ const App = () => {
   const [activeTab, setActiveTab] = useState('review'); // review, history
 
   useEffect(() => {
+    // Helper to decode both standard and URL-safe Base64 safely with UTF-8
+    const decodeBase64 = (str) => {
+      // Replace URL-safe chars back to standard base64 chars
+      let standardBase64 = str.replace(/-/g, '+').replace(/_/g, '/');
+      // Add missing padding
+      while (standardBase64.length % 4) {
+        standardBase64 += '=';
+      }
+      return JSON.parse(decodeURIComponent(escape(atob(standardBase64))));
+    };
+
     // Get content from URL params (p is base64 encoded JSON)
     const params = new URLSearchParams(window.location.search);
-    const p = params.get('p');
+    let p = params.get('p');
     const c = params.get('c'); // Backward compatibility
     
+    // Fallback: extract from path-based routing (e.g. /review/<payload> or /p/<payload>)
+    if (!p && !c) {
+      const path = window.location.pathname;
+      const match = path.match(/\/(review|p)\/([^/]+)/);
+      if (match && match[2]) {
+        p = decodeURIComponent(match[2]);
+      }
+    }
+
     if (p) {
       try {
-        const decoded = JSON.parse(decodeURIComponent(escape(atob(p))));
+        const decoded = decodeBase64(p);
         if (decoded.t === 'engagement') {
           setPayloadType('engagement');
           setComment(decoded.c || '');
