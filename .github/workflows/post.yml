@@ -12,8 +12,7 @@ on:
 
 jobs:
   generate:
-    # Run only at 10:00 AM IST (4:30 AM UTC) and 6:00 PM IST (12:30 PM UTC)
-    if: (github.event_name == 'schedule' && (github.event.schedule == '30 4 * * *' || github.event.schedule == '0 13 * * *')) || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Generate Post & Notify
     runs-on: ubuntu-latest
     steps:
@@ -80,6 +79,13 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           USER_EMAIL: ${{ secrets.USER_EMAIL }}
           PORTAL_URL: ${{ secrets.PORTAL_URL }}
+
+      - name: Reply to Comments on My Posts
+        run: python main.py --reply-comments
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
 
   comment:
     if: github.event.action == 'publish_comment'

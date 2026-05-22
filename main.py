@@ -11,6 +11,8 @@ from datetime import date, datetime, timedelta
 import json
 from twilio.rest import Client
 import traceback
+import urllib.parse
+
 
 # Ensure console supports emojis/unicode on Windows
 if sys.platform == "win32":
@@ -255,7 +257,7 @@ def discover_relevant_posts() -> list:
     try:
         config = {'tools': [{'google_search': {}}]}
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-flash-latest",
             contents=prompt,
             config=config
         )
@@ -290,7 +292,7 @@ def generate_engagement_comment(post_url: str) -> str:
     Write ONLY the comment."""
 
     try:
-        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        response = client.models.generate_content(model="gemini-flash-latest", contents=prompt)
         return response.text.strip()
     except Exception as e:
         print(f"⚠️ Comment generation error: {e}")
@@ -322,7 +324,7 @@ def send_comment_review_email(post_url: str, comment: str) -> None:
     }
     
     encoded_payload = base64.b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8')
-    review_link = f"{portal_url}?p={encoded_payload}"
+    review_link = f"{portal_url}?p={urllib.parse.quote(encoded_payload)}"
 
     html_content = f"""
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
@@ -373,7 +375,7 @@ def send_premium_email(content: str, image_url: str = None) -> None:
         payload["i"] = image_url
         
     encoded_payload = base64.b64encode(json.dumps(payload).encode('utf-8')).decode('utf-8')
-    review_link = f"{portal_url}?p={encoded_payload}"
+    review_link = f"{portal_url}?p={urllib.parse.quote(encoded_payload)}"
 
     html_content = f"""
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
@@ -471,6 +473,170 @@ def post_comment_to_linkedin(post_id: str, comment: str) -> None:
             print(f"   Response: {e.response.text}")
 
 
+# ─── Reply to Comments on My Posts ────────────────────────────────────────────
+def reply_to_comments() -> None:
+    print("🔍 Starting comment reply process...")
+    token = os.getenv("LINKEDIN_ACCESS_TOKEN")
+    urn = os.getenv("LINKEDIN_PERSON_URN")
+    if not token or not urn:
+        print("⚠️ LinkedIn token or person URN missing. Skipping.")
+        return
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "X-Restli-Protocol-Version": "2.0.0",
+    }
+
+    import urllib.parse
+    encoded_urn = urllib.parse.quote(urn)
+    
+    # 1. Fetch recent posts by this author
+    print("🔍 Fetching recent posts...")
+    posts_url = f"https://api.linkedin.com/v2/ugcPosts?q=authors&authors=List({encoded_urn})&count=10"
+    try:
+        resp = requests.get(posts_url, headers=headers)
+        if resp.status_code == 403:
+            print("\n⚠️  [ACCESS DENIED] Your LinkedIn Access Token does not have permission to read posts and comments.")
+            print("👉 To enable automated comment replies, your LinkedIn developer app needs the 'r_member_social' (or 'r_organization_social') permission.")
+            print("👉 You can request this in the LinkedIn Developer Portal (https://developer.linkedin.com/) under the 'Products' tab or by requesting the Community Management API.")
+            print("👉 Skipping comment replying for now. The workflow will complete successfully.")
+            return
+        resp.raise_for_status()
+        posts_data = resp.json().get("elements", [])
+        print(f"✅ Found {len(posts_data)} recent posts.")
+    except Exception as e:
+        print(f"❌ Failed to fetch recent posts: {e}")
+        return
+
+    try:
+        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    except Exception as e:
+        print(f"❌ Failed to initialize Gemini client: {e}")
+        return
+
+    replied_count = 0
+    for post in posts_data:
+        post_id = post.get("id")
+        if not post_id:
+            continue
+        
+        # Extract post text for context
+        share_commentary = post.get("specificContent", {}).get("com.linkedin.ugc.ShareContent", {}).get("shareCommentary", {})
+        post_text = share_commentary.get("text", "")
+        
+        print(f"\nProcessing post ID: {post_id}")
+        
+        # 2. Fetch comments on this post
+        encoded_post_id = urllib.parse.quote(post_id)
+        comments_url = f"https://api.linkedin.com/v2/socialActions/{encoded_post_id}/comments?count=50"
+        try:
+            c_resp = requests.get(comments_url, headers=headers)
+            if c_resp.status_code == 403:
+                print(f"   ⚠️  [ACCESS DENIED] Forbidden to read comments for post {post_id}. Skipping.")
+                continue
+            c_resp.raise_for_status()
+            comments = c_resp.json().get("elements", [])
+            print(f"   Found {len(comments)} comments on this post.")
+        except Exception as e:
+            print(f"   ⚠️ Failed to fetch comments: {e}")
+            continue
+
+        for comment in comments:
+            comment_id = comment.get("id")
+            comment_actor = comment.get("actor")
+            comment_text = comment.get("message", {}).get("text", "")
+            
+            # Skip if it is our own comment
+            if comment_actor == urn:
+                continue
+                
+            if not comment_id or not comment_text:
+                continue
+
+            print(f"   💬 Comment by {comment_actor}: '{comment_text}'")
+            
+            # 3. Check if we've already replied to this comment
+            encoded_comment_id = urllib.parse.quote(comment_id)
+            replies_url = f"https://api.linkedin.com/v2/socialActions/{encoded_post_id}/comments?parentComment={encoded_comment_id}"
+            try:
+                r_resp = requests.get(replies_url, headers=headers)
+                if r_resp.status_code == 403:
+                    print(f"   ⚠️  [ACCESS DENIED] Forbidden to read replies for comment {comment_id}. Skipping.")
+                    continue
+                r_resp.raise_for_status()
+                replies = r_resp.json().get("elements", [])
+            except Exception as e:
+                print(f"   ⚠️ Failed to fetch replies for comment {comment_id}: {e}")
+                continue
+
+            # Check if any reply is written by us
+            already_replied = any(reply.get("actor") == urn for reply in replies)
+            if already_replied:
+                print("   Already replied. Skipping.")
+                continue
+
+            # 4. Generate reply using Gemini
+            print("   🤖 Generating reply comment with Gemini...")
+            prompt = f"""You are a top-tier Indian Entrepreneur and Tech Visionary. 
+You wrote this LinkedIn post:
+\"\"\"
+{post_text}
+\"\"\"
+
+A reader commented:
+\"{comment_text}\"
+
+Write a short, engaging, and professional reply (under 2 sentences).
+- Sound helpful, genuine, and conversational.
+- Match the persona. Do not sound robotic or generic ("Thanks for commenting!").
+- No hashtags, no emojis.
+- Keep it concise.
+
+Write ONLY the reply text."""
+
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=prompt
+                )
+                reply_text = response.text.strip()
+            except Exception as ge:
+                print(f"   ⚠️ Gemini reply generation failed: {ge}")
+                continue
+
+            if not reply_text:
+                continue
+
+            # 5. Post reply to LinkedIn
+            print(f"   🚀 Posting reply: '{reply_text}'")
+            reply_payload = {
+                "actor": urn,
+                "object": post_id,
+                "message": {
+                    "text": reply_text
+                },
+                "parentComment": comment_id
+            }
+
+            try:
+                post_resp = requests.post(
+                    f"https://api.linkedin.com/v2/socialActions/{encoded_post_id}/comments",
+                    headers=headers,
+                    json=reply_payload
+                )
+                post_resp.raise_for_status()
+                print("   ✅ Reply posted successfully!")
+                replied_count += 1
+                time.sleep(3) # Small delay to respect rate limits
+            except Exception as pe:
+                print(f"   ❌ Failed to post reply: {pe}")
+                if hasattr(pe, 'response') and pe.response is not None:
+                    print(f"      Response: {pe.response.text}")
+                    
+    print(f"\n🎉 Comment reply process completed! Sent {replied_count} replies.")
+
+
 # ─── Send Twilio Notification ─────────────────────────────────────────────────
 def send_twilio_notification(message: str) -> None:
     account_sid = os.getenv("TWILIO_ACCOUNT_SID")
@@ -506,6 +672,7 @@ if __name__ == "__main__":
     parser.add_argument('--content', type=str, help='Direct content to post (overrides draft.txt)')
     parser.add_argument('--comment', type=str, help='First comment to post under the content')
     parser.add_argument('--activity_id', type=str, help='External activity URN to comment on')
+    parser.add_argument('--reply-comments', action='store_true', help='Reply to comments on your own LinkedIn posts')
     args = parser.parse_args()
 
     if args.generate:
@@ -572,6 +739,13 @@ if __name__ == "__main__":
             print(f"❌ Error during engagement discovery: {e}")
             exit(1)
 
+    elif args.reply_comments:
+        try:
+            reply_to_comments()
+        except Exception as e:
+            print(f"❌ Error during comment replying: {e}")
+            exit(1)
+
     elif args.post:
         print("📤 Preparing to post...")
         try:
@@ -590,19 +764,18 @@ if __name__ == "__main__":
                 print("🚀 Posting to LinkedIn...")
                 post_id = post_to_linkedin(post)
                 
-                # Post comment
-                print("⏳ Waiting 3s before posting comment...")
-                time.sleep(3)
-                
-                if args.comment:
-                    comment = args.comment
+                # Post comment (only if explicitly provided)
+                if args.comment and args.comment.strip():
+                    print("⏳ Waiting 3s before posting comment...")
+                    time.sleep(3)
+                    print(f"💬 Posting comment: {args.comment}")
+                    post_comment_to_linkedin(post_id, args.comment.strip())
+                    notification_msg = f"✅ LinkedIn Post Published Successfully!\nPost ID: {post_id}\nComment: {args.comment.strip()}"
                 else:
-                    print("💬 Generating comment...")
-                    comment = generate_comment(post)
+                    print("💬 No first comment provided. Skipping self-commenting.")
+                    notification_msg = f"✅ LinkedIn Post Published Successfully!\nPost ID: {post_id}"
                 
-                post_comment_to_linkedin(post_id, comment)
-                
-                send_twilio_notification(f"✅ LinkedIn Post Published Successfully!\nPost ID: {post_id}\nComment: {comment}")
+                send_twilio_notification(notification_msg)
             print("🎉 Done!")
         except Exception as e:
             error_msg = f"❌ LinkedIn Posting Failed: {e}"
@@ -615,8 +788,6 @@ if __name__ == "__main__":
         try:
             post = generate_post()
             post_id = post_to_linkedin(post)
-            comment = generate_comment(post)
-            post_comment_to_linkedin(post_id, comment)
             send_twilio_notification(f"✅ Auto LinkedIn Post Published!\nPost ID: {post_id}")
         except Exception as e:
             error_msg = f"❌ Auto LinkedIn Process Failed: {e}"
