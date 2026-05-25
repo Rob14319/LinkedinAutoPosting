@@ -292,6 +292,7 @@ def discover_relevant_posts() -> list:
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     
     import random
+    import re
     topic = random.choice(TOPICS)
     
     prompt = f"Find 5 current LinkedIn post URLs about {topic} from the last 24 hours. Just provide the URLs."
