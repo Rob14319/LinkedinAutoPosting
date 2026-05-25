@@ -354,11 +354,32 @@ def generate_engagement_comment(post_url: str) -> str:
     Write ONLY the comment."""
 
     try:
-        response = client.models.generate_content(model="gemini-flash-latest", contents=prompt)
-        return response.text.strip()
+        comment = None
+        for model_name in ["gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]:
+            try:
+                print(f"🤖 Attempting to draft comment with {model_name}...")
+                response = client.models.generate_content(model=model_name, contents=prompt)
+                comment = response.text.strip()
+                if comment:
+                    print(f"✅ Comment successfully drafted with {model_name}!")
+                    break
+            except Exception as ge:
+                print(f"⚠️ Drafting failed with {model_name}: {ge}")
+
+        if not comment:
+            print("⚠️ Falling back to curated premium comment template...")
+            import random
+            comment_templates = [
+                "Absolutely spot on. In the Indian market, building trust and solving for high Customer Acquisition Costs requires D2C brands to prioritize long-term brand equity and community-led retention over sheer performance spend.",
+                "Fascinating perspective. The future of Indian entrepreneurship relies on leveraging smart digital infrastructure, but scaling profitably past the product-market fit stage demands disciplined unit economics.",
+                "Highly relevant analysis. Standing out in a saturated Indian digital ecosystem requires D2C founders to focus on genuine, content-driven storytelling and authentic, hyper-local consumer trust."
+            ]
+            comment = random.choice(comment_templates)
+
+        return comment
     except Exception as e:
         print(f"⚠️ Comment generation error: {e}")
-        return None
+        return "Insightful take. Building sustainable branding is the key differentiator for Indian startup growth."
 
 def send_comment_review_email(post_url: str, comment: str) -> None:
     """Sends an email to approve a comment on someone else's post."""
