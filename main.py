@@ -38,15 +38,18 @@ TOPICS = [
 ]
 
 # ─── Generate post with Gemini ─────────────────────────────────────────────────
-def generate_post() -> str:
+def generate_post(type_override: str = None) -> str:
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     # Determine post type based on time (2 short, 2 long)
     # 10 AM (4:30 UTC) & 6 PM (12:30 UTC) = Long (Story-driven)
     # 2 PM (8:30 UTC) & 11 PM (17:30 UTC) = Short (Punchy/Insightful)
     # Manual trigger usually happens around 3 PM - 4 PM IST (Slot 15)
-    current_hour_ist = (datetime.utcnow() + timedelta(hours=5, minutes=30)).hour
-    is_long = current_hour_ist in [10, 18, 15, 16, 17, 19] # Included manual test hours
+    if type_override:
+        is_long = (type_override == "long")
+    else:
+        current_hour_ist = (datetime.utcnow() + timedelta(hours=5, minutes=30)).hour
+        is_long = current_hour_ist in [10, 18, 15, 16, 17, 19] # Included manual test hours
     
     post_type = "Long Form Story (200-300 words)" if is_long else "Short & Punchy (50-100 words)"
     
@@ -211,15 +214,33 @@ def post_to_linkedin(content: str) -> str:
 def generate_image_with_grok(post_content: str) -> str:
     api_key = os.getenv("XAI_API_KEY")
     if not api_key or api_key == "your_xai_api_key_here":
+        print("⚠️ Grok API key is missing or set to placeholder. Skipping image generation.")
         return None
 
     print("🎨 Generating image with Grok...")
     try:
         # First, get a good image prompt from Gemini based on the post
         client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        prompt_request = f"Create a short, professional, high-quality image generation prompt for a LinkedIn post with this content: {post_content[:500]}. Style: Modern, entrepreneurial, high-tech, clean. Focus on one central object or a conceptual scene."
-        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt_request)
-        image_prompt = response.text.strip()
+        prompt_request = f"Create a short, professional, high-quality image generation prompt for a LinkedIn post with this content: {post_content[:500]}. Style: Modern, entrepreneurial, high-tech, clean. Focus on one central object or a conceptual scene. Write ONLY the prompt, no introductory text."
+        
+        image_prompt = None
+        for model_name in ["gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite-001"]:
+            try:
+                print(f"🤖 Attempting to draft image prompt with {model_name}...")
+                response = client.models.generate_content(model=model_name, contents=prompt_request)
+                image_prompt = response.text.strip()
+                if image_prompt:
+                    print(f"✅ Image prompt successfully drafted with {model_name}!")
+                    break
+            except Exception as ge:
+                print(f"⚠️ {model_name} failed to generate image prompt: {ge}")
+        
+        if not image_prompt:
+            print("⚠️ Falling back to a clean template-based image prompt...")
+            clean_text = ' '.join(post_content.split()[:15]).replace('"', '').replace("'", "")
+            image_prompt = f"Conceptual vector illustration representing the business theme: '{clean_text}...'. Style: modern, professional, high-tech, clean, minimalist design, corporate blue and slate palette, no text."
+
+        print(f"📝 Image Prompt for Grok: {image_prompt}")
 
         # Call xAI Image Generation API
         headers = {
@@ -228,7 +249,7 @@ def generate_image_with_grok(post_content: str) -> str:
         }
         payload = {
             "prompt": image_prompt,
-            "model": "grok-beta", # xAI's vision/generation capable model
+            "model": "grok-imagine-image-quality", # Standard xAI image model
             "n": 1,
             "size": "1024x1024"
         }
@@ -240,7 +261,18 @@ def generate_image_with_grok(post_content: str) -> str:
         return data['data'][0]['url']
     except Exception as e:
         print(f"⚠️ Grok Image error: {e}")
-        return None
+        print("🔄 Falling back to Pollinations AI for 100% free, high-quality image generation...")
+        try:
+            # Clean up the image prompt for URL encoding
+            clean_prompt = image_prompt.replace('\n', ' ').strip()
+            encoded_prompt = urllib.parse.quote(clean_prompt)
+            # Use pollinations.ai for beautiful free image generation
+            pollinations_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&nologo=true&private=true&enhance=true"
+            print(f"✅ Generated Pollinations AI fallback URL: {pollinations_url}")
+            return pollinations_url
+        except Exception as pe:
+            print(f"⚠️ Pollinations fallback failed: {pe}")
+            return None
 
 
 # ─── Post Discovery (Engagement Bot) ──────────────────────────────────────────
@@ -671,6 +703,7 @@ def send_twilio_notification(message: str) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--generate', action='store_true', help='Generate post and send review email')
+    parser.add_argument('--type', type=str, choices=['long', 'short'], help='Force post type: long or short')
     parser.add_argument('--engage', action='store_true', help='Discover posts and draft engagement comments')
     parser.add_argument('--post', action='store_true', help='Publish the post to LinkedIn')
     parser.add_argument('--content', type=str, help='Direct content to post (overrides draft.txt)')
@@ -682,7 +715,7 @@ if __name__ == "__main__":
     if args.generate:
         print("🤖 Generating post process started...")
         try:
-            post = generate_post()
+            post = generate_post(args.type)
             print("\n--- Generated Post ---")
             print(post)
             print("----------------------\n")
@@ -693,7 +726,8 @@ if __name__ == "__main__":
             # Generate image for long slots
             current_hour_ist = (datetime.utcnow() + timedelta(hours=5, minutes=30)).hour
             image_url = None
-            if current_hour_ist in [10, 18, 15, 16]:
+            is_long_slot = (args.type == "long") if args.type else (current_hour_ist in [10, 18, 15, 16, 17, 19])
+            if is_long_slot:
                 image_url = generate_image_with_grok(post)
 
             write_github_summary(post)
@@ -800,7 +834,7 @@ if __name__ == "__main__":
     else:
         # Default behavior: generate and post immediately
         try:
-            post = generate_post()
+            post = generate_post(args.type)
             post_id = post_to_linkedin(post)
             send_twilio_notification(f"✅ Auto LinkedIn Post Published!\nPost ID: {post_id}")
         except Exception as e:

@@ -28,10 +28,18 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Generate Post and Send Email
-        run: python main.py --generate
+        run: |
+          if [ "${{ github.event.schedule }}" = "30 4 * * *" ] || [ "${{ github.event.schedule }}" = "30 12 * * *" ]; then
+            python main.py --generate --type long
+          elif [ "${{ github.event.schedule }}" = "30 8 * * *" ] || [ "${{ github.event.schedule }}" = "30 17 * * *" ]; then
+            python main.py --generate --type short
+          else
+            python main.py --generate
+          fi
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
           USER_EMAIL: ${{ secrets.USER_EMAIL }}
           PORTAL_URL: ${{ secrets.PORTAL_URL }}
           GITHUB_RUN_ID: ${{ github.run_id }}
