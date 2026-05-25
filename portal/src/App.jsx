@@ -73,7 +73,7 @@ const App = () => {
     try {
       const payload = payloadType === 'engagement' 
         ? { comment, type: 'engagement', activityId }
-        : { content, comment };
+        : { content, comment, imageUrl };
         
       await axios.post('/api/publish', payload);
       

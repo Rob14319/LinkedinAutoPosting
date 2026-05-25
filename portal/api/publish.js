@@ -5,7 +5,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const { content, comment, type, activityId } = req.body;
+  const { content, comment, type, activityId, imageUrl } = req.body;
   const GITHUB_TOKEN = (process.env.GITHUB_TOKEN || '').trim();
   const REPO_OWNER = (process.env.REPO_OWNER || '').trim();
   const REPO_NAME = (process.env.REPO_NAME || '').trim();
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/dispatches`,
       {
         event_type: eventType,
-        client_payload: { content, comment, activityId, type }
+        client_payload: { content, comment, activityId, type, imageUrl }
       },
       {
         headers: {

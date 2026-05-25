@@ -174,7 +174,7 @@ def write_github_summary(content: str) -> None:
 
 
 # ─── Post to LinkedIn ──────────────────────────────────────────────────────────
-def post_to_linkedin(content: str) -> str:
+def post_to_linkedin(content: str, image_url: str = None) -> str:
     token = os.getenv("LINKEDIN_ACCESS_TOKEN")
     urn = os.getenv("LINKEDIN_PERSON_URN")
 
@@ -190,13 +190,23 @@ def post_to_linkedin(content: str) -> str:
         "specificContent": {
             "com.linkedin.ugc.ShareContent": {
                 "shareCommentary": {"text": content},
-                "shareMediaCategory": "NONE",
+                "shareMediaCategory": "IMAGE" if image_url else "NONE",
             }
         },
         "visibility": {
             "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
         },
     }
+
+    if image_url:
+        payload["specificContent"]["com.linkedin.ugc.ShareContent"]["media"] = [
+            {
+                "status": "READY",
+                "description": {"text": "AI Generated Visual"},
+                "originalUrl": image_url,
+                "title": {"text": "Visual"}
+            }
+        ]
 
     response = requests.post(
         "https://api.linkedin.com/v2/ugcPosts",
@@ -746,11 +756,13 @@ if __name__ == "__main__":
             exit(1)
 
     elif args.engage:
-        print("🔍 Engagement discovery started (Auto-Publishing)...")
+        print("🔍 Engagement discovery started (Approval Mode)...")
         try:
             posts = discover_relevant_posts()
-            published_count = 0
+            sent_count = 0
             for url in posts:
+                if sent_count >= 10:
+                    break
                 print(f"🔍 Processing URL: {url}")
                 # Extract activity ID
                 import re
@@ -764,15 +776,15 @@ if __name__ == "__main__":
                 comment = generate_engagement_comment(url)
                 if comment:
                     try:
-                        print(f"🚀 Auto-Publishing comment to: {url}")
-                        post_comment_to_linkedin(f"urn:li:activity:{activity_id}", comment)
-                        published_count += 1
-                        # Sleep to avoid rate limits
-                        time.sleep(5)
+                        print(f"🚀 Sending comment review email for: {url}")
+                        send_comment_review_email(url, comment)
+                        sent_count += 1
+                        # Sleep to avoid Resend rate limits
+                        time.sleep(2)
                     except Exception as pe:
-                        print(f"⚠️ Failed to auto-post: {pe}")
+                        print(f"⚠️ Failed to send comment email: {pe}")
             
-            print(f"🎉 Engagement complete! Auto-published {published_count} comments.")
+            print(f"🎉 Engagement complete! Sent {sent_count} comment reviews for approval.")
         except Exception as e:
             print(f"❌ Error during engagement discovery: {e}")
             exit(1)
@@ -809,8 +821,10 @@ if __name__ == "__main__":
                     with open("draft.txt", "r", encoding="utf-8") as f:
                         post = f.read()
                 
+                # Fetch image from environment if passed
+                image_env = os.getenv("POST_IMAGE")
                 print("🚀 Posting to LinkedIn...")
-                post_id = post_to_linkedin(post)
+                post_id = post_to_linkedin(post, image_url=image_env)
                 
                 # Post comment (only if explicitly provided)
                 if comment and comment.strip():

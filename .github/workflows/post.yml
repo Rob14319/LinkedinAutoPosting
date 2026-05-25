@@ -72,6 +72,7 @@ jobs:
           LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
           POST_CONTENT: ${{ github.event.client_payload.content }}
           POST_COMMENT: ${{ github.event.client_payload.comment }}
+          POST_IMAGE: ${{ github.event.client_payload.imageUrl }}
           TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
           TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
