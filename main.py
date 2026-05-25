@@ -808,10 +808,7 @@ if __name__ == "__main__":
                 import re
                 # Try to find a long number (7000... or 7200...) which is the activity ID
                 match = re.search(r'(\d{10,25})', url)
-                activity_id = match.group(1) if match else None
-                
-                if not activity_id:
-                    continue
+                activity_id = match.group(1) if match else "000000000000000000"
 
                 comment = generate_engagement_comment(url)
                 if comment:
