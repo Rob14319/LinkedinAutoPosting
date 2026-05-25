@@ -14,6 +14,20 @@ const App = () => {
   const [error, setError] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [activeTab, setActiveTab] = useState('review'); // review, history
+  const [copiedPost, setCopiedPost] = useState(false);
+  const [copiedComment, setCopiedComment] = useState(false);
+
+  const handleCopyPost = () => {
+    navigator.clipboard.writeText(content);
+    setCopiedPost(true);
+    setTimeout(() => setCopiedPost(false), 2000);
+  };
+
+  const handleCopyComment = () => {
+    navigator.clipboard.writeText(comment);
+    setCopiedComment(true);
+    setTimeout(() => setCopiedComment(false), 2000);
+  };
 
   useEffect(() => {
     // Helper to decode both standard and URL-safe Base64 safely with UTF-8
@@ -200,7 +214,15 @@ const App = () => {
                       <div className="edit-section">
                         {payloadType !== 'engagement' && (
                           <>
-                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>POST CONTENT</label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-dim)' }}>POST CONTENT</label>
+                              <button 
+                                onClick={handleCopyPost}
+                                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: copiedPost ? '#22c55e' : 'var(--accent)', padding: '0.3rem 0.8rem', fontSize: '0.75rem', cursor: 'pointer', transition: 'all 0.2s ease', fontWeight: '500' }}
+                              >
+                                {copiedPost ? 'Copied! ✓' : 'Copy Post'}
+                              </button>
+                            </div>
                             <textarea 
                               className="premium-textarea"
                               value={content}
@@ -211,9 +233,17 @@ const App = () => {
                           </>
                         )}
                         
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-dim)', marginTop: payloadType === 'engagement' ? '0' : '1.5rem', marginBottom: '0.5rem' }}>
-                          {payloadType === 'engagement' ? 'ENGAGEMENT COMMENT' : 'FIRST COMMENT (Optional - good for links)'}
-                        </label>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: payloadType === 'engagement' ? '0' : '1.5rem', marginBottom: '0.5rem' }}>
+                          <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-dim)' }}>
+                            {payloadType === 'engagement' ? 'ENGAGEMENT COMMENT' : 'FIRST COMMENT (Optional - good for links)'}
+                          </label>
+                          <button 
+                            onClick={handleCopyComment}
+                            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: copiedComment ? '#22c55e' : 'var(--accent)', padding: '0.3rem 0.8rem', fontSize: '0.75rem', cursor: 'pointer', transition: 'all 0.2s ease', fontWeight: '500' }}
+                          >
+                            {copiedComment ? 'Copied! ✓' : 'Copy Comment'}
+                          </button>
+                        </div>
                         <textarea 
                           className="premium-textarea comment-textarea"
                           value={comment}
