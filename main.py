@@ -324,8 +324,8 @@ def discover_relevant_posts() -> list:
         if not urls:
             print("⚠️ No URLs found or Gemini search was rate-limited. Using curated test URLs in your niche...")
             urls = [
-                "https://www.linkedin.com/posts/niche-marketing-trends-activity-7195438290184755200-abcd",
-                "https://www.linkedin.com/posts/indian-d2c-startup-scaling-activity-7194837291039485952-efgh"
+                "https://www.linkedin.com/posts/activity-7119561026042851328",
+                "https://www.linkedin.com/posts/activity-7128643890123456789"
             ]
 
         print(f"DEBUG: Found filtered URLs: {urls}")
@@ -335,8 +335,8 @@ def discover_relevant_posts() -> list:
         print(f"⚠️ Discovery error: {e}")
         # Always fallback so flow doesn't break
         return [
-            "https://www.linkedin.com/posts/niche-marketing-trends-activity-7195438290184755200-abcd",
-            "https://www.linkedin.com/posts/indian-d2c-startup-scaling-activity-7194837291039485952-efgh"
+            "https://www.linkedin.com/posts/activity-7119561026042851328",
+            "https://www.linkedin.com/posts/activity-7128643890123456789"
         ]
 
 def generate_engagement_comment(post_url: str) -> str:
