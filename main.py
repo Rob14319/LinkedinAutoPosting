@@ -715,6 +715,7 @@ if __name__ == "__main__":
     parser.add_argument('--generate', action='store_true', help='Generate post and send review email')
     parser.add_argument('--type', type=str, choices=['long', 'short'], help='Force post type: long or short')
     parser.add_argument('--engage', action='store_true', help='Discover posts and draft engagement comments')
+    parser.add_argument('--limit', type=int, help='Max number of engagement comments to draft')
     parser.add_argument('--post', action='store_true', help='Publish the post to LinkedIn')
     parser.add_argument('--content', type=str, help='Direct content to post (overrides draft.txt)')
     parser.add_argument('--comment', type=str, help='First comment to post under the content')
@@ -760,8 +761,9 @@ if __name__ == "__main__":
         try:
             posts = discover_relevant_posts()
             sent_count = 0
+            limit = args.limit if args.limit is not None else 10
             for url in posts:
-                if sent_count >= 10:
+                if sent_count >= limit:
                     break
                 print(f"🔍 Processing URL: {url}")
                 # Extract activity ID
